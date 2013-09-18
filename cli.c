@@ -54,14 +54,19 @@
 #include "tests.h"
 #include "uart.h"
 
+#define GLITCH_STATUS   0x00
+#define GLITCH_WIDTH    0x01
+#define GLITCH_DELAY0   0x02
+#define GLITCH_DELAY1   0x03
+
 void vPortUsedMem(int *, int *, int *);
 
 commandList_t *activeCommandList;
 
 extern size_t read(int, unsigned char *, size_t );
 
-static int __attribute__ ((unused)) prv_cli_led_set (int , portCHAR **);
-static int __attribute__ ((unused)) prv_cli_led_clr (int , portCHAR **);
+static int __attribute__ ((unused)) prv_cli_led_set(int , portCHAR **);
+static int __attribute__ ((unused)) prv_cli_led_clr(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_fpga(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_fpga_halt(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_fpga_reset(int , portCHAR **);
@@ -80,6 +85,10 @@ static int __attribute__ ((unused)) prv_cli_data_write(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_data_read(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_buf_on(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_buf_off(int , portCHAR **);
+
+static int __attribute__ ((unused)) prv_cli_glitch_delay(int , portCHAR **);
+static int __attribute__ ((unused)) prv_cli_glitch_width(int , portCHAR **);
+static int __attribute__ ((unused)) prv_cli_glicth_start(int , portCHAR **);
 
 static int prv_cli_help(int , portCHAR **);
 static int prv_cli_version(int , portCHAR **);
@@ -133,6 +142,15 @@ static const commandList_t commandListADV [] =
   { NULL,          0,  0, CMDTYPE_FUNCTION,  { NULL             }, NULL,                           NULL },
 };
 
+static const commandList_t commandListGlitch [] =
+{
+  { "help",     0,  0, CMDTYPE_FUNCTION,  { prv_cli_help        }, "This help list",               "'help' has no parameters" },
+  { "delay",    0,  1, CMDTYPE_FUNCTION,  { prv_cli_glitch_delay}, "delay [cycles] - if cycles number is not specified, current value is shown.", "'delay' has 1 parameters" },
+  { "width",    0,  1, CMDTYPE_FUNCTION,  { prv_cli_glitch_width}, "width [cycles] - if cycles number is not specified, current value is shown.", "'width' has 1 parameters" },
+  { "start",    0,  0, CMDTYPE_FUNCTION,  { prv_cli_glicth_start}, "start - starts the glitcher module.", "'start' has no parameters" },
+  { NULL,       0,  0, CMDTYPE_FUNCTION,  { NULL                }, NULL,                           NULL },
+};
+
 static const commandList_t commandList [] =
 {
     { "mem",     0,  1, CMDTYPE_CMDLIST,   { commandListMem     }, "Various memory functions",          "'mem help' for help list" },
@@ -144,6 +162,7 @@ static const commandList_t commandList [] =
     { "help",    0,  0, CMDTYPE_FUNCTION,  { prv_cli_help       }, "This help list",                    "'help' has no parameters" },
     { "credits", 0,  0, CMDTYPE_FUNCTION,  { prv_cli_credits    }, "Display credits, greets & shoutz",  "'version' has no parameters" },
     { "reboot",  0,  0, CMDTYPE_FUNCTION,  { prv_cli_reboot     }, "Reset Datenkrake",                  "'reboot' has no parameters" },
+
 // aliases
     { "R",      0,  0, CMDTYPE_FUNCTION,  { prv_cli_fpga_reset  }, "FPGA reset",                        "'R' reset FPGA" },
     { "H",      0,  0, CMDTYPE_FUNCTION,  { prv_cli_fpga_halt   }, "FPGA halt (reset high)",            "'H' halt FPGA - no params" },
@@ -160,6 +179,10 @@ static const commandList_t commandList [] =
     { "L",      1,  1, CMDTYPE_FUNCTION,  { prv_cli_led_ctl_all }, "LED control all",                   "'L <status>' - control all LEDs - status = 0 or 1" },
     { "w",      2,  2, CMDTYPE_FUNCTION,  { prv_cli_data_write  }, "Data write",                        "'w <reg> <data>' write 8-bit data <data> to register <reg>" },
     { "r",      1,  1, CMDTYPE_FUNCTION,  { prv_cli_data_read   }, "Data read",                         "'r <reg>' read register <reg>" },
+
+// Glitcher
+    { "glitch", 0, 2,  CMDTYPE_CMDLIST,   { commandListGlitch   }, "Glitcher functions",                "'glitch help' for help list" },
+
     { NULL,     0,  0, CMDTYPE_FUNCTION,  { NULL                }, NULL,                                NULL },
 };
 
@@ -698,13 +721,47 @@ static int prv_cli_help(int argc __attribute__ ((unused)), portCHAR **argv __att
   return 0;
 }
 
+// ******************************************************** ** ** **  **    *       *         *               *
 
+static int __attribute__ ((unused)) prv_cli_glitch_delay (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
+{
+    unsigned int delay = 0;
 
+    if(argc < 1) {
+        io_fpga_register_read(GLITCH_DELAY0);
+        Delay(100);
+        io_fpga_register_read(GLITCH_DELAY1);
+    } else {
+        delay = strtol(argv[0], NULL, 10) & 0xFFFF;
+        io_fpga_register_write(GLITCH_DELAY0, delay & 0xFF);
+        io_fpga_register_write(GLITCH_DELAY1, (delay >> 8) & 0xFF);
+    }
 
+    return 0;
+}
 
+static int __attribute__ ((unused)) prv_cli_glitch_width (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
+{
+    unsigned int width = 0;
 
+    if (argc < 1) {
+        io_fpga_register_read(GLITCH_WIDTH);
+    } else {
+        width = strtol(argv[0], NULL, 10) & 0xFF;
+        io_fpga_register_write(GLITCH_WIDTH, width);
+    }
 
+    return 0;
+}
 
+static int __attribute__ ((unused)) prv_cli_glicth_start (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
+{
+    io_fpga_register_write(GLITCH_STATUS, 0x1);
+
+    return 0;
+}
+
+// ******************************************************** ** ** **  **    *       *         *               *
 
 //
 //  bufferLength includes the space reserved for the \0
