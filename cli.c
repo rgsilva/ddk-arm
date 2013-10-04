@@ -59,6 +59,15 @@
 #define GLITCH_DELAY0   0x02
 #define GLITCH_DELAY1   0x03
 
+#define CLKA_STATUS     0x80
+#define CLKA_DIVIDER    0x81
+#define CLKB_STATUS     0x90
+#define CLKB_DIVIDER    0x91
+#define CLKC_STATUS     0xA0
+#define CLKC_DIVIDER    0xA1
+#define CLKD_STATUS     0xB0
+#define CLKD_DIVIDER    0xB1
+
 void vPortUsedMem(int *, int *, int *);
 
 commandList_t *activeCommandList;
@@ -88,7 +97,10 @@ static int __attribute__ ((unused)) prv_cli_buf_off(int , portCHAR **);
 
 static int __attribute__ ((unused)) prv_cli_glitch_delay(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_glitch_width(int , portCHAR **);
-static int __attribute__ ((unused)) prv_cli_glicth_start(int , portCHAR **);
+static int __attribute__ ((unused)) prv_cli_glitch_start(int , portCHAR **);
+
+static int __attribute__ ((unused)) prv_cli_clock_div(int , portCHAR **);
+static int __attribute__ ((unused)) prv_cli_clock_en(int , portCHAR **);
 
 static int prv_cli_help(int , portCHAR **);
 static int prv_cli_version(int , portCHAR **);
@@ -147,7 +159,15 @@ static const commandList_t commandListGlitch [] =
   { "help",     0,  0, CMDTYPE_FUNCTION,  { prv_cli_help        }, "This help list",               "'help' has no parameters" },
   { "delay",    0,  1, CMDTYPE_FUNCTION,  { prv_cli_glitch_delay}, "delay [cycles] - if cycles number is not specified, current value is shown.", "'delay' has 1 parameters" },
   { "width",    0,  1, CMDTYPE_FUNCTION,  { prv_cli_glitch_width}, "width [cycles] - if cycles number is not specified, current value is shown.", "'width' has 1 parameters" },
-  { "start",    0,  0, CMDTYPE_FUNCTION,  { prv_cli_glicth_start}, "start - starts the glitcher module.", "'start' has no parameters" },
+  { "start",    0,  0, CMDTYPE_FUNCTION,  { prv_cli_glitch_start}, "start - starts the glitcher module.", "'start' has no parameters" },
+  { NULL,       0,  0, CMDTYPE_FUNCTION,  { NULL                }, NULL,                           NULL },
+};
+
+static const commandList_t commandListClock [] =
+{
+  { "help",     0,  0, CMDTYPE_FUNCTION,  { prv_cli_help        }, "This help list",               "'help' has no parameters" },
+  { "div",      0,  2, CMDTYPE_FUNCTION,  { prv_cli_clock_div   }, "div [clkgen] [div] - if divider is not specified, current value is shown.", "'div' has 2 parameters." },
+  { "en",       0,  2, CMDTYPE_FUNCTION,  { prv_cli_clock_en    }, "en [clkgen] - if clkgen is not specified, all clocks are shown.", "'en' has 1 parameters." },
   { NULL,       0,  0, CMDTYPE_FUNCTION,  { NULL                }, NULL,                           NULL },
 };
 
@@ -182,6 +202,10 @@ static const commandList_t commandList [] =
 
 // Glitcher
     { "glitch", 0, 2,  CMDTYPE_CMDLIST,   { commandListGlitch   }, "Glitcher functions",                "'glitch help' for help list" },
+    { "g",		  0, 0,  CMDTYPE_FUNCTION,  { prv_cli_glitch_start}, "Start the glitcher",                "'g' start glitching" },
+
+// Clock generators
+    { "clk",    0, 2,  CMDTYPE_CMDLIST,   { commandListClock    }, "Clock generator functions",         "'clk help' for help list" },
 
     { NULL,     0,  0, CMDTYPE_FUNCTION,  { NULL                }, NULL,                                NULL },
 };
@@ -754,9 +778,97 @@ static int __attribute__ ((unused)) prv_cli_glitch_width (int argc __attribute__
     return 0;
 }
 
-static int __attribute__ ((unused)) prv_cli_glicth_start (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
+static int __attribute__ ((unused)) prv_cli_glitch_start (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
 {
+	io_fpga_register_write(0x80, 1);
+	io_fpga_register_write(0x81, 80);
+
     io_fpga_register_write(GLITCH_STATUS, 0x1);
+
+    return 0;
+}
+
+// ******************************************************** ** ** **  **    *       *         *               *
+
+static int __attribute__ ((unused)) prv_cli_clock_div (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
+{
+    unsigned int div = 0;
+
+    if(argc < 2) {
+        io_fpga_register_read(CLKA_DIVIDER);
+        Delay(100);
+        io_fpga_register_read(CLKB_DIVIDER);
+        Delay(100);
+        io_fpga_register_read(CLKC_DIVIDER);
+        Delay(100);
+        io_fpga_register_read(CLKD_DIVIDER);
+    } else {
+        div = strtol(argv[1], NULL, 10) & 0xFFFF;
+
+        switch (argv[0][0]) {
+            case 'a':
+            case 'A':
+              io_fpga_register_write(CLKA_DIVIDER, div);
+              break;
+
+            case 'b':
+            case 'B':
+              io_fpga_register_write(CLKB_DIVIDER, div);
+              break;
+
+            case 'c':
+            case 'C':
+              io_fpga_register_write(CLKC_DIVIDER, div);
+              break;
+
+            case 'd':
+            case 'D':
+              io_fpga_register_write(CLKD_DIVIDER, div);
+              break;
+        }
+    }
+
+    return 0;
+
+}
+
+static int __attribute__ ((unused)) prv_cli_clock_en (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
+{
+    unsigned int en = 0;
+
+    if(argc < 2) {
+        io_fpga_register_read(CLKA_STATUS);
+        Delay(100);
+        io_fpga_register_read(CLKB_STATUS);
+        Delay(100);
+        io_fpga_register_read(CLKC_STATUS);
+        Delay(100);
+        io_fpga_register_read(CLKD_STATUS);
+    } else {
+        en = strtol(argv[1], NULL, 10) & 0xFFFF;
+
+        switch (argv[0][0]) {
+            case 'a':
+            case 'A':
+              io_fpga_register_write(CLKA_STATUS, en);
+              break;
+
+            case 'b':
+            case 'B':
+              io_fpga_register_write(CLKB_STATUS, en);
+              break;
+
+            case 'c':
+            case 'C':
+              io_fpga_register_write(CLKC_STATUS, en);
+              break;
+
+            case 'd':
+            case 'D':
+              io_fpga_register_write(CLKD_STATUS, en);
+              break;
+        }
+    }
 
     return 0;
 }
