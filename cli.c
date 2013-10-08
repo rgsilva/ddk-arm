@@ -54,12 +54,16 @@
 #include "tests.h"
 #include "uart.h"
 
-#define GLITCH_STATUS     0x00
-#define GLITCH_WIDTH      0x01
-#define GLITCH_DELAY0     0x02
-#define GLITCH_DELAY1     0x03
-#define GLITCH_MODE       0x04
-#define GLITCH_MODE_INFO  "(0x0 = Nothing, 0x1 = AND, 0x2 = OR, 0x4 = XOR, 0x8 = Enable)\n"
+#define GLITCH_STATUS         0x00
+#define GLITCH_WIDTH          0x01
+#define GLITCH_DELAY0         0x02
+#define GLITCH_DELAY1         0x03
+#define GLITCH_MODE           0x04
+
+#define GLITCH_MODE_BYPASS    0x00
+#define GLITCH_MODE_ZERO      0x01
+#define GLITCH_MODE_ONE       0x02
+#define GLITCH_MODE_NOT       0x04
 
 #define CLKA_STATUS       0x80
 #define CLKA_DIVIDER      0x81
@@ -162,7 +166,7 @@ static const commandList_t commandListGlitch [] =
   { "help",     0,  0, CMDTYPE_FUNCTION,  { prv_cli_help        }, "This help list",               "'help' has no parameters" },
   { "delay",    0,  1, CMDTYPE_FUNCTION,  { prv_cli_glitch_delay}, "delay [cycles] - if cycles number is not specified, current value is shown.", "'delay' has 1 parameter" },
   { "width",    0,  1, CMDTYPE_FUNCTION,  { prv_cli_glitch_width}, "width [cycles] - if cycles number is not specified, current value is shown.", "'width' has 1 parameter" },
-  { "mode",     0,  1, CMDTYPE_FUNCTION,  { prv_cli_glitch_mode }, "mode [mode] - if mode is not specified, current value is shown.", "'mode' has 1 parameter" },
+  { "mode",     0,  1, CMDTYPE_FUNCTION,  { prv_cli_glitch_mode }, "mode [mode] - if mode is not specified, current value is shown. (bypass, zero, one, not)", "'mode' has 1 parameter" },
   { "start",    0,  0, CMDTYPE_FUNCTION,  { prv_cli_glitch_start}, "start - starts the glitcher module.", "'start' has no parameters" },
   { NULL,       0,  0, CMDTYPE_FUNCTION,  { NULL                }, NULL,                           NULL },
 };
@@ -787,11 +791,21 @@ static int __attribute__ ((unused)) prv_cli_glitch_mode (int argc __attribute__ 
     unsigned int mode = 0;
 
     if (argc < 1) {
-          printf(GLITCH_MODE_INFO);
         io_fpga_register_read(GLITCH_MODE);
     } else {
+        if (!strcmp(argv[0], "bypass")) {
+          io_fpga_register_write(GLITCH_MODE, GLITCH_MODE_BYPASS);
+        } else if (!strcmp(argv[0], "zero")) {
+          io_fpga_register_write(GLITCH_MODE, GLITCH_MODE_ZERO);
+        } else if (!strcmp(argv[0], "one")) {
+          io_fpga_register_write(GLITCH_MODE, GLITCH_MODE_ONE);
+        } else if (!strcmp(argv[0], "not")) {
+          io_fpga_register_write(GLITCH_MODE, GLITCH_MODE_NOT);
+        } else {
+          printf("Invalid mode: %s\n", argv[0]);
+        }
         mode = strtol(argv[0], NULL, 10) & 0xFF;
-        io_fpga_register_write(GLITCH_MODE, mode);
+        
     }
 
     return 0;
