@@ -214,8 +214,8 @@ static const commandList_t commandList [] =
     { "glitch", 0, 2,  CMDTYPE_CMDLIST,   { commandListGlitch   }, "Glitcher functions",                "'glitch help' for help list" },
     { "g",		  0, 0,  CMDTYPE_FUNCTION,  { prv_cli_glitch_start}, "Start the glitcher",                "'g' starts glitching" },
     { "gq",     2, 3,  CMDTYPE_FUNCTION,  { prv_cli_glitch_queue}, "Queues a setup to the glitcher",    "'gq <delay> <width> <mode>' "},
-    { "gf",     1, 4,  CMDTYPE_FUNCTION,  { prv_cli_glitch_fill }, "-- GLITCH FILL TEST --",            "'gf <times> [delay] [width] [mode]"},
-    { "gt",     2, 2,  CMDTYPE_FUNCTION,  { prv_cli_glitch_try  }, "-- GLITCH 'TRY' TEST --",           "'gt <delay> <width>' "},
+    { "gf",     1, 4,  CMDTYPE_FUNCTION,  { prv_cli_glitch_fill }, "Fills the glitcher FIFO",           "'gf <times> [delay] [width] [mode]"},
+    { "gt",     2, 2,  CMDTYPE_FUNCTION,  { prv_cli_glitch_try  }, "Try a combination of glitching",    "'gt <delay> <width>' "},
     { "fifo",   0, 0,  CMDTYPE_FUNCTION,  { prv_cli_glitch_fifo }, "Checks the status of the FIFO",     "'fifo' checks the FIFO"},
 
 // Clock generators
@@ -878,23 +878,13 @@ static int __attribute__ ((unused)) prv_cli_glitch_fill (int argc __attribute__ 
         return 1;
     }
 
-    printf("+ Filling FIFO (delay = %d, width = %d, mode = %d)...\n", delay, width, mode);
     for (i = 0; i < c; i++) {
       io_fpga_register_write(GLITCH_QUEUE_0, mode);
       io_fpga_register_write(GLITCH_QUEUE_1, width);
       io_fpga_register_write(GLITCH_QUEUE_2, delayL);
       io_fpga_register_write(GLITCH_QUEUE_3, delayH);
-      Delay(10);
+      Delay(1);
     }
-    printf("+ Done.\n");    
-
-    printf("? Empty:\n");
-    io_fpga_register_read(0x05);
-    
-    Delay(20);
-    
-    printf("? Full:\n");
-    io_fpga_register_read(0x06);
 }
 
 static int __attribute__ ((unused)) prv_cli_glitch_start (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
