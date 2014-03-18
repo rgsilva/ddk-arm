@@ -67,6 +67,7 @@
 #define GLITCH_MODE_ONE       0x02
 #define GLITCH_MODE_NOT       0x04
 #define GLITCH_MODE_CLKGL     0x08
+#define GLITCH_MODE_CLKGEN    0x10
 
 #define CLKA_STATUS       0x80
 #define CLKA_DIVIDER      0x81
@@ -106,7 +107,6 @@ static int __attribute__ ((unused)) prv_cli_buf_off(int , portCHAR **);
 
 static int __attribute__ ((unused)) prv_cli_glitch_fill(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_glitch_queue(int , portCHAR **);
-static int __attribute__ ((unused)) prv_cli_glitch_start(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_glitch_try(int , portCHAR **);
 static int __attribute__ ((unused)) prv_cli_glitch_fifo(int , portCHAR **);
 
@@ -169,8 +169,11 @@ static const commandList_t commandListGlitch [] =
 {
   { "help",     0,  0, CMDTYPE_FUNCTION,  { prv_cli_help        }, "This help list",               "'help' has no parameters" },
   { "queue",    2,  3, CMDTYPE_FUNCTION,  { prv_cli_glitch_queue}, "queue <delay> <width> [mode] - queues the specified configuration", "'queue' has 3 parameters" },
-  { "start",    0,  0, CMDTYPE_FUNCTION,  { prv_cli_glitch_start}, "start - starts the glitcher module.", "'start' has no parameters" },
+  { "fill",     1,  4, CMDTYPE_FUNCTION,  { prv_cli_glitch_fill }, "fill <times> [delay] [width] [mode] - fills the FIFO with the specified configuration (or NOP)", "'fifo' has 1 parameter"},
+  { "try",      2,  2, CMDTYPE_FUNCTION,  { prv_cli_glitch_try  }, "try <delay> <width> - try a single glitch setting", "'try' has 1 parameter"},
+  { "fifo",     0,  0, CMDTYPE_FUNCTION,  { prv_cli_glitch_fifo }, "fifo - checks the FIFO status", "'fifo' has no parameters"},
   { NULL,       0,  0, CMDTYPE_FUNCTION,  { NULL                }, NULL,                           NULL },
+
 };
 
 static const commandList_t commandListClock [] =
@@ -212,7 +215,6 @@ static const commandList_t commandList [] =
 
 // Glitcher
     { "glitch", 0, 2,  CMDTYPE_CMDLIST,   { commandListGlitch   }, "Glitcher functions",                "'glitch help' for help list" },
-    { "g",		  0, 0,  CMDTYPE_FUNCTION,  { prv_cli_glitch_start}, "Start the glitcher",                "'g' starts glitching" },
     { "gq",     2, 3,  CMDTYPE_FUNCTION,  { prv_cli_glitch_queue}, "Queues a setup to the glitcher",    "'gq <delay> <width> <mode>' "},
     { "gf",     1, 4,  CMDTYPE_FUNCTION,  { prv_cli_glitch_fill }, "Fills the glitcher FIFO",           "'gf <times> [delay] [width] [mode]"},
     { "gt",     2, 2,  CMDTYPE_FUNCTION,  { prv_cli_glitch_try  }, "Try a combination of glitching",    "'gt <delay> <width>' "},
@@ -785,6 +787,8 @@ static int __attribute__ ((unused)) prv_cli_glitch_queue (int argc __attribute__
           mode = GLITCH_MODE_NOT;
       } else if (!strcmp(argv[2], "clkgl")) {
           mode = GLITCH_MODE_CLKGL;
+      } else if (!strcmp(argv[2], "clkgen")) {
+          mode = GLITCH_MODE_CLKGEN;
       } else {
           printf("Invalid mode: %s\n", argv[2]);
           return 1;
@@ -809,7 +813,7 @@ static int __attribute__ ((unused)) prv_cli_glitch_try (int argc __attribute__ (
     delayH = (delay >> 8) & 0xFF;
     width = strtol(argv[1], NULL, 10) & 0xFF;
 
-    io_fpga_register_write(GLITCH_QUEUE_0, GLITCH_MODE_CLKGL);
+    io_fpga_register_write(GLITCH_QUEUE_0, GLITCH_MODE_CLKGEN);
     io_fpga_register_write(GLITCH_QUEUE_1, width);
     io_fpga_register_write(GLITCH_QUEUE_2, delayL);
     io_fpga_register_write(GLITCH_QUEUE_3, delayH);
@@ -869,6 +873,8 @@ static int __attribute__ ((unused)) prv_cli_glitch_fill (int argc __attribute__ 
           mode = GLITCH_MODE_NOT;
       } else if (!strcmp(argv[3], "clkgl")) {
           mode = GLITCH_MODE_CLKGL;
+      } else if (!strcmp(argv[3], "clkgen")) {
+          mode = GLITCH_MODE_CLKGEN;
       } else {
           printf("Invalid mode: %s\n", argv[2]);
           return 1;
@@ -885,13 +891,6 @@ static int __attribute__ ((unused)) prv_cli_glitch_fill (int argc __attribute__ 
       io_fpga_register_write(GLITCH_QUEUE_3, delayH);
       Delay(1);
     }
-}
-
-static int __attribute__ ((unused)) prv_cli_glitch_start (int argc __attribute__ ((unused)), portCHAR **argv __attribute__ ((unused)))
-{
-    io_fpga_register_write(GLITCH_STATUS, 0x1);
-
-    return 0;
 }
 
 // ******************************************************** ** ** **  **    *       *         *               *
